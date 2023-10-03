@@ -1,113 +1,280 @@
-import Image from 'next/image'
+"use client";
+
+import { User } from "@prisma/client";
+import { ChangeEvent, MouseEvent, useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { FaPenToSquare, FaTrashCan } from "react-icons/fa6";
 
 export default function Home() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [user, setUser] = useState<User>({
+    id: 0,
+    login: "",
+    email: "",
+    password: "",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  const modal = useRef<HTMLDialogElement | null>(null);
+  const GetUsers = async () => {
+    const res = await axios.get("/api/users").catch((error) => {
+      console.log("catch: ", error.message);
+    });
+
+    if (res && res.data) {
+      setUsers(res.data.users);
+      setUser((prevState) => ({
+        ...prevState,
+        id: 0,
+        login: "",
+        email: "",
+        password: "",
+      }));
+    }
+  };
+
+  useEffect(() => {
+    GetUsers();
+  }, []);
+
+  const AddUser = async (e: MouseEvent<HTMLButtonElement>) => {
+    setErrors([]);
+    const validationErrors: string[] = [];
+
+    if (user.login.length < 1) {
+      validationErrors.push("Login can't be empty");
+    }
+    if (user.email.length < 1) {
+      validationErrors.push("Email can't be empty");
+    }
+    if (user.password.length < 3) {
+      validationErrors.push("Password must be 3 characters or more");
+    }
+
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    e.preventDefault();
+
+    const resp = await axios.post("/api/users", {
+      login: user.login,
+      email: user.email,
+      password: user.password,
+    });
+
+    if (resp && resp.data) {
+      GetUsers();
+    }
+  };
+
+  const UpdateUser = async (e: MouseEvent<HTMLButtonElement>) => {
+    setErrors([]);
+    if (user.login.length < 1) {
+      setErrors((prevState) => [...prevState, "Login cant'n be empty"]);
+      return;
+    } else if (user.email.length < 1) {
+      setErrors((prevState) => [...prevState, "Email cant'n be empty"]);
+      return;
+    } else if (user.password.length < 3) {
+      setErrors((prevState) => [
+        ...prevState,
+        "Password must be 3 characters or more",
+      ]);
+      return;
+    }
+    e.preventDefault();
+
+    const resp = await axios.put("/api/users/", {
+      id: user.id,
+      login: user.login,
+      email: user.email,
+      password: user.password,
+    });
+
+    if (resp && resp.data) {
+      console.log("UpdateUser->resp.data: ", resp.data);
+      GetUsers();
+    }
+  };
+
+  const ResetUser = () => {
+    setUser((prevState) => ({
+      ...prevState,
+      id: 0,
+      login: "",
+      email: "",
+      password: "",
+    }));
+  };
+
+  const EditUser = (userId: number) => {
+    const userFound = users.find((user) => user.id === userId);
+    if (userFound) {
+      setUser(userFound);
+    }
+  };
+
+  const DeleteUser = async (userId: number, deleteConfirm: boolean) => {
+    if (modal.current) {
+      modal.current.showModal();
+    }
+
+    if (!deleteConfirm) {
+      setUser((user) => ({ ...user, id: userId }));
+      return;
+    }
+    const resp = await axios
+      .delete("/api/users", {
+        params: { id: user.id },
+      })
+      .catch((error) => {
+        console.log("catch: ", error.message);
+      });
+
+    if (resp && resp.data) {
+      GetUsers();
+    }
+  };
+
+  const CancelEdit = () => {
+    ResetUser();
+  };
+
+  // Update specific input field
+  const HandleChange = (e: ChangeEvent<HTMLInputElement>) =>
+    setUser((prevState) => ({ ...prevState, [e.target.name]: e.target.value }));
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <main className="h-screen w-screen flex flex-col items-center justify-center gap-4">
+      <h1 className="mb-4 font-bold text-4xl">Users</h1>
+      <div className="card border border-gray-200 bg-base-100 p-4 shadow-xl">
+        <div className="flex gap-4 divide-x-2 divide-dotted">
+          <div className="space-y-4">
+            <ul>
+              {errors.map((error, idx) => (
+                <li className="text-red-500" key={idx}>
+                  {error}
+                </li>
+              ))}
+            </ul>
+
+            <form className="flex flex-col gap-2">
+              <input
+                onChange={HandleChange}
+                value={user.login}
+                type="text"
+                name="login"
+                required
+                placeholder="Login"
+                className="input input-bordered"
+              />
+              <input
+                onChange={HandleChange}
+                value={user.email}
+                type="email"
+                name="email"
+                required
+                placeholder="Email"
+                className="input input-bordered"
+              />
+              <input
+                onChange={HandleChange}
+                value={user.password}
+                type="password"
+                name="password"
+                required
+                placeholder="Password"
+                minLength={3}
+                className="input input-bordered"
+              />
+              <div className="space-x-4">
+                <button
+                  type="submit"
+                  disabled={user.id > 0 ? true : false}
+                  onClick={AddUser}
+                  className="btn btn-primary disabled:bg-gray-500 disabled:text-gray-300"
+                >
+                  Add
+                </button>
+                <button
+                  type="submit"
+                  disabled={user.id < 1 ? true : false}
+                  onClick={UpdateUser}
+                  className="btn btn-accent disabled:bg-gray-500 disabled:text-gray-300"
+                >
+                  Update
+                </button>
+                <button
+                  type="submit"
+                  disabled={user.id < 1 ? true : false}
+                  onClick={CancelEdit}
+                  className="btn btn-primary disabled:bg-gray-500 disabled:text-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="ps-4 overflow-auto">
+            <table className="table">
+              <thead className="table-head">
+                <tr>
+                  <th>ID</th>
+                  <th>Login</th>
+                  <th>Email</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user: User) => (
+                  <tr key={user.id}>
+                    <td>{user.id}</td>
+                    <td>{user.login}</td>
+                    <td>{user.email}</td>
+                    <td className="space-x-2">
+                      <button
+                        className="btn btn-warning btn-sm"
+                        onClick={() => EditUser(user.id)}
+                      >
+                        <FaPenToSquare />
+                      </button>
+                      <button
+                        className="btn btn-error btn-sm"
+                        onClick={() => DeleteUser(user.id, false)}
+                      >
+                        <FaTrashCan />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+      <dialog ref={modal} id="deleteModal" className="modal">
+        <form method="dialog" className="modal-box">
+          <button className="btn btn-circle btn-ghost btn-sm absolute right-2 top-2">
+            ✕
+          </button>
+          <h3 className="text-lg font-bold">Delete</h3>
+          <p className="py-4">Are you sure you want to delete this user?</p>
+          <div className="modal-action">
+            <button
+              onClick={() => DeleteUser(user.id, true)}
+              className="btn btn-primary"
+            >
+              Yes
+            </button>
+          </div>
+        </form>
+      </dialog>
     </main>
-  )
+  );
 }
