@@ -106,6 +106,7 @@ export default function ReactHookFormWithZod() {
           id: toastId,
         }
       );
+      
       resetUser();
     } catch (error) {
       console.log("🚀 ~ file: page.tsx:118 ~ create ~ error:", error);
