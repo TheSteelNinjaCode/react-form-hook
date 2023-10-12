@@ -23,10 +23,9 @@ export default function CustomForm() {
   const modal = useRef<HTMLDialogElement | null>(null);
 
   const GetUsers = async () => {
-    const res = await axios.get("https://nextjs.test.thesteelninjacode.com/cls-user.php").catch((error) => {
+    const res = await axios.get("/api/users").catch((error) => {
       console.log("catch: ", error.message);
     });
-    console.log("🚀 ~ file: page.tsx:29 ~ GetUsers ~ res:", res)
 
     if (res && res.data) {
       setUsers(res.data.users);
