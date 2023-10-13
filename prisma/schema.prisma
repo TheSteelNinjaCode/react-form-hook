@@ -23,5 +23,5 @@ model User {
   updatedAt DateTime @updatedAt
 
   @@unique([login, email])
-  @@map("users")
+  @@map("Users")
 }
